@@ -6,19 +6,18 @@ from pyppeteer import launch
 import asyncio
 import os
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager  # Import asynccontextmanager
 
 load_dotenv()  # Load environment variables
-
-app = FastAPI()
 
 # Configure browser launch options
 BROWSER_OPTIONS = {
     "headless": "new",
     "args": ["--no-sandbox", "--disable-setuid-sandbox"],
-    "executablePath": os.getenv("PUPPETEER_EXECUTABLE_PATH") # Get executable path from environment variable
+    "executablePath": os.getenv("PUPPETEER_EXECUTABLE_PATH")
 }
 
-# Global browser instance (optional)
+# Global browser instance
 browser = None
 
 async def get_browser():
@@ -32,6 +31,16 @@ async def close_browser():
     if browser:
         await browser.close()
         browser = None
+
+# --- Lifespan Event Handler ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic (nothing to do here in this case, as get_browser handles it)
+    yield
+    # Shutdown logic
+    await close_browser()
+
+app = FastAPI(lifespan=lifespan) # Use lifespan event handler
 
 # --- Request Models ---
 class ScreenshotRequest(BaseModel):
@@ -83,8 +92,3 @@ async def evaluate_javascript(request: EvaluateRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    await close_browser()
